@@ -1,0 +1,909 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>NeuroQuiz — 神経内科クイズ</title>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
+<style>
+*{box-sizing:border-box;margin:0;padding:0}
+:root{
+  --bg:#f0f4f8;--surface:#fff;
+  --primary:#1e40af;--primary-l:#3b82f6;--primary-d:#1e3a8a;
+  --text:#1e293b;--muted:#64748b;--border:#e2e8f0;
+  --green:#16a34a;--green-bg:#f0fdf4;
+  --yellow:#b45309;--yellow-bg:#fefce8;
+  --red:#dc2626;--red-bg:#fef2f2;
+  --sh:0 2px 8px rgba(0,0,0,.10);--sh-lg:0 8px 24px rgba(0,0,0,.12);
+}
+body{font-family:-apple-system,'Hiragino Kaku Gothic ProN','Yu Gothic',sans-serif;background:var(--bg);color:var(--text);min-height:100vh}
+
+/* ── Lock screen ── */
+#lock-screen{position:fixed;inset:0;background:var(--primary-d);z-index:9999;display:flex;flex-direction:column;align-items:center;justify-content:center;padding:2rem}
+.lock-box{background:#fff;border-radius:20px;padding:2rem 1.75rem;width:100%;max-width:340px;text-align:center;box-shadow:0 20px 60px rgba(0,0,0,.4)}
+.lock-logo{font-size:2.5rem;margin-bottom:.5rem}
+.lock-title{font-size:1.15rem;font-weight:800;color:var(--primary);margin-bottom:.25rem}
+.lock-sub{font-size:.8rem;color:var(--muted);margin-bottom:1.5rem}
+.lock-input{width:100%;padding:.75rem;border:2px solid var(--border);border-radius:10px;font-size:1.1rem;text-align:center;letter-spacing:.15em;font-family:inherit;color:var(--text);transition:.15s;margin-bottom:.75rem}
+.lock-input:focus{outline:none;border-color:var(--primary-l)}
+.lock-btn{width:100%;padding:.8rem;background:var(--primary);color:#fff;border:none;border-radius:10px;font-size:1rem;font-weight:700;cursor:pointer;transition:.15s}
+.lock-btn:hover{background:var(--primary-d)}
+.lock-err{font-size:.82rem;color:var(--red);margin-top:.5rem;min-height:1.2rem}
+
+/* ── Nav ── */
+.nav{background:var(--primary);color:#fff;padding:0 1rem;display:flex;align-items:center;height:52px;gap:2px;box-shadow:var(--sh);position:sticky;top:0;z-index:100}
+.nav-logo{font-weight:800;font-size:1.05rem;margin-right:auto;letter-spacing:-.3px}
+.nav-btn{background:none;border:none;color:rgba(255,255,255,.7);padding:.45rem .7rem;cursor:pointer;border-radius:6px;font-size:.82rem;font-weight:600;transition:.15s}
+.nav-btn:hover,.nav-btn.active{background:rgba(255,255,255,.18);color:#fff}
+
+/* ── Layout ── */
+.main{max-width:720px;margin:0 auto;padding:1.25rem 1rem}
+
+/* ── Cards ── */
+.card{background:var(--surface);border-radius:14px;padding:1.25rem;box-shadow:var(--sh);border:1px solid var(--border);margin-bottom:1rem}
+
+/* ── Stats ── */
+.stat-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:.75rem;margin-bottom:1.25rem}
+.stat-box{background:var(--surface);border-radius:12px;padding:.9rem .5rem;text-align:center;border:1px solid var(--border);box-shadow:var(--sh)}
+.stat-num{font-size:1.8rem;font-weight:800;color:var(--primary)}
+.stat-lbl{font-size:.7rem;color:var(--muted);margin-top:.15rem}
+
+/* ── Quiz card ── */
+.quiz-card{background:var(--surface);border-radius:16px;padding:1.75rem;box-shadow:var(--sh-lg);border:1px solid var(--border)}
+.quiz-q{font-size:1.05rem;line-height:1.75;color:var(--text)}
+.progress-bar{height:5px;background:var(--border);border-radius:99px;margin-bottom:1.25rem;overflow:hidden}
+.progress-fill{height:100%;background:var(--primary-l);border-radius:99px;transition:width .3s}
+.progress-lbl{font-size:.75rem;color:var(--muted);text-align:right;margin-top:-.9rem;margin-bottom:1rem}
+
+.reveal-btn{width:100%;margin-top:1.5rem;padding:.85rem;border:2px solid var(--primary-l);background:#eff6ff;color:var(--primary);border-radius:10px;font-size:.95rem;font-weight:700;cursor:pointer;transition:.15s}
+.reveal-btn:hover{background:#dbeafe}
+
+.quiz-answer{margin-top:1.5rem;padding-top:1.25rem;border-top:2px solid var(--border)}
+.ans-label{font-size:.7rem;font-weight:800;color:var(--green);text-transform:uppercase;letter-spacing:.07em;margin-bottom:.4rem}
+.ans-text{font-size:.95rem;line-height:1.65}
+.exp-text{font-size:.83rem;color:var(--muted);line-height:1.6;margin-top:.6rem}
+.gl-box{margin-top:.75rem;padding:.65rem .8rem;background:var(--bg);border-radius:8px;font-size:.8rem;line-height:1.5}
+
+.diff-row{display:flex;gap:.6rem;margin-top:1.25rem}
+.diff-btn{flex:1;padding:.75rem .4rem;border:none;border-radius:10px;cursor:pointer;font-size:.83rem;font-weight:700;line-height:1.4;transition:.15s}
+.diff-hard{background:var(--red-bg);color:var(--red)}.diff-hard:hover{background:#fee2e2}
+.diff-normal{background:#eff6ff;color:#1d4ed8}.diff-normal:hover{background:#dbeafe}
+.diff-easy{background:var(--green-bg);color:var(--green)}.diff-easy:hover{background:#dcfce7}
+
+.srs-note{font-size:.72rem;color:var(--muted);text-align:center;margin-top:.6rem}
+
+/* ── Badges ── */
+.badge{display:inline-flex;align-items:center;gap:.25rem;padding:.2rem .65rem;border-radius:99px;font-size:.72rem;font-weight:700}
+.cat-stroke{background:#fef3c7;color:#92400e}
+.cat-ep{background:#f3e8ff;color:#6b21a8}
+.cat-imm{background:#e0f2fe;color:#075985}
+.cat-mus{background:#fce7f3;color:#9d174d}
+.cat-deg{background:#f1f5f9;color:#334155}
+.cat-oth{background:#f5f5f4;color:#57534e}
+
+.gl-badge{display:inline-flex;align-items:center;gap:.25rem;padding:.18rem .55rem;border-radius:6px;font-size:.72rem;font-weight:700;cursor:help}
+.gl-green{background:var(--green-bg);color:var(--green)}
+.gl-yellow{background:var(--yellow-bg);color:var(--yellow)}
+.gl-red{background:var(--red-bg);color:var(--red)}
+
+/* ── Source chip ── */
+.src-chip{display:inline-flex;align-items:center;gap:.35rem;padding:.25rem .65rem;background:var(--bg);border:1px solid var(--border);border-radius:99px;font-size:.72rem;color:var(--muted);text-decoration:none;max-width:100%;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+
+/* ── Add paper ── */
+.tab-bar{display:flex;gap:.2rem;background:var(--bg);border-radius:10px;padding:.2rem;margin-bottom:1.25rem}
+.tab-btn{flex:1;padding:.45rem;border:none;background:none;border-radius:8px;font-size:.82rem;cursor:pointer;color:var(--muted);font-weight:600;transition:.15s}
+.tab-btn.active{background:var(--surface);color:var(--primary);box-shadow:var(--sh)}
+
+.upload-zone{border:2px dashed var(--border);border-radius:12px;padding:2rem;text-align:center;cursor:pointer;transition:.15s;color:var(--muted)}
+.upload-zone:hover,.upload-zone.drag{border-color:var(--primary-l);background:#eff6ff;color:var(--primary)}
+
+/* ── Form ── */
+.inp-grp{margin-bottom:.9rem}
+label{display:block;font-size:.8rem;font-weight:700;color:var(--muted);margin-bottom:.35rem}
+input[type=text],input[type=password],textarea,select{width:100%;padding:.6rem .8rem;border:1.5px solid var(--border);border-radius:8px;font-size:.88rem;font-family:inherit;color:var(--text);transition:.15s;background:var(--surface)}
+input:focus,textarea:focus,select:focus{outline:none;border-color:var(--primary-l)}
+textarea{resize:vertical;min-height:90px}
+
+/* ── Buttons ── */
+.btn{padding:.6rem 1.1rem;border-radius:8px;font-size:.88rem;font-weight:700;cursor:pointer;border:none;transition:.15s;display:inline-flex;align-items:center;gap:.4rem}
+.btn-primary{background:var(--primary);color:#fff}.btn-primary:hover{background:var(--primary-d)}.btn-primary:disabled{opacity:.5;cursor:not-allowed}
+.btn-secondary{background:var(--bg);color:var(--text);border:1.5px solid var(--border)}.btn-secondary:hover{background:var(--border)}
+.btn-danger{background:var(--red-bg);color:var(--red)}.btn-danger:hover{background:#fee2e2}
+
+/* ── Loading ── */
+.loading{display:flex;flex-direction:column;align-items:center;justify-content:center;padding:2.5rem;gap:.85rem;color:var(--muted)}
+.spinner{width:38px;height:38px;border:3px solid var(--border);border-top-color:var(--primary-l);border-radius:50%;animation:spin .75s linear infinite}
+@keyframes spin{to{transform:rotate(360deg)}}
+
+/* ── Empty ── */
+.empty{text-align:center;padding:2.5rem 1rem;color:var(--muted)}
+.empty-icon{font-size:2.5rem;margin-bottom:.75rem}
+
+/* ── Question list ── */
+.q-item{background:var(--surface);border:1px solid var(--border);border-radius:10px;padding:.9rem 1rem;margin-bottom:.65rem;cursor:pointer;transition:.15s}
+.q-item:hover{box-shadow:var(--sh);border-color:var(--primary-l)}
+.q-hdr{display:flex;align-items:center;gap:.4rem;flex-wrap:wrap;margin-bottom:.4rem}
+.q-text{font-size:.88rem;line-height:1.5}
+.q-meta{font-size:.72rem;color:var(--muted);margin-top:.4rem;display:flex;gap:.9rem;flex-wrap:wrap}
+
+/* ── Filter chips ── */
+.filter-row{display:flex;gap:.4rem;flex-wrap:wrap;margin-bottom:1rem}
+.fc{padding:.25rem .65rem;border-radius:99px;font-size:.75rem;font-weight:700;cursor:pointer;border:1.5px solid var(--border);background:var(--surface);color:var(--muted);transition:.15s}
+.fc.active{background:var(--primary);color:#fff;border-color:var(--primary)}
+
+/* ── Review chips ── */
+.rc{display:inline-block;padding:.12rem .45rem;border-radius:4px;font-size:.68rem;font-weight:700}
+.rc-due{background:var(--red-bg);color:var(--red)}
+.rc-soon{background:var(--yellow-bg);color:var(--yellow)}
+.rc-later{background:var(--bg);color:var(--muted)}
+
+/* ── Modal ── */
+.modal-ov{position:fixed;inset:0;background:rgba(0,0,0,.45);z-index:200;display:flex;align-items:center;justify-content:center;padding:1rem}
+.modal{background:var(--surface);border-radius:16px;padding:1.5rem;max-width:540px;width:100%;max-height:82vh;overflow-y:auto;box-shadow:var(--sh-lg)}
+.modal-hdr{display:flex;justify-content:space-between;align-items:center;margin-bottom:1rem}
+.modal-title{font-size:1rem;font-weight:800}
+.close-btn{background:none;border:none;cursor:pointer;font-size:1.2rem;color:var(--muted)}
+hr{border:none;border-top:1px solid var(--border);margin:.85rem 0}
+
+/* ── Toast ── */
+#toast{position:fixed;bottom:1.25rem;left:50%;transform:translateX(-50%) translateY(80px);background:var(--text);color:#fff;padding:.65rem 1.1rem;border-radius:99px;font-size:.83rem;transition:transform .3s;z-index:300;white-space:nowrap}
+#toast.show{transform:translateX(-50%) translateY(0)}
+
+/* ── Header row ── */
+.hdr-row{display:flex;justify-content:space-between;align-items:center;margin-bottom:1.25rem}
+.page-title{font-size:1.2rem;font-weight:800}
+
+/* ── Complete screen ── */
+.complete-screen{text-align:center;padding:2.5rem 1rem}
+
+/* ── Util ── */
+.hidden{display:none!important}
+.row{display:flex;gap:.6rem;flex-wrap:wrap}
+
+@media(max-width:480px){.stat-num{font-size:1.45rem}.diff-btn{font-size:.75rem}}
+</style>
+</head>
+<body>
+
+<!-- ══════════════════════════ LOCK SCREEN ════════════════════════════ -->
+<div id="lock-screen" style="display:none">
+  <div class="lock-box">
+    <div class="lock-logo">🧠</div>
+    <div class="lock-title">NeuroQuiz</div>
+    <div class="lock-sub">パスワードを入力してください</div>
+    <input class="lock-input" type="password" id="lock-in" placeholder="••••••" maxlength="32"
+      onkeydown="if(event.key==='Enter')doUnlock()">
+    <button class="lock-btn" onclick="doUnlock()">ロック解除</button>
+    <div class="lock-err" id="lock-err"></div>
+  </div>
+</div>
+
+<!-- ═══════════════════════════════ NAV ═══════════════════════════════ -->
+<nav class="nav">
+  <div class="nav-logo">🧠 NeuroQuiz</div>
+  <button class="nav-btn active" id="nav-study"    onclick="nav('study')">学習</button>
+  <button class="nav-btn"        id="nav-add"      onclick="nav('add')">追加</button>
+  <button class="nav-btn"        id="nav-questions"onclick="nav('questions')">問題集</button>
+  <button class="nav-btn"        id="nav-settings" onclick="nav('settings')">設定</button>
+</nav>
+
+<div class="main">
+
+<!-- ═══════════════════════════ STUDY VIEW ═══════════════════════════ -->
+<div id="view-study">
+  <div class="stat-grid">
+    <div class="stat-box"><div class="stat-num" id="s-today">0</div><div class="stat-lbl">今日の残り</div></div>
+    <div class="stat-box"><div class="stat-num" id="s-streak">0</div><div class="stat-lbl">連続 🔥</div></div>
+    <div class="stat-box"><div class="stat-num" id="s-total">0</div><div class="stat-lbl">総問題数</div></div>
+  </div>
+  <div id="quiz-area"></div>
+</div>
+
+<!-- ═══════════════════════════ ADD VIEW ════════════════════════════ -->
+<div id="view-add" class="hidden">
+  <div class="hdr-row"><div class="page-title">論文・記事を追加</div></div>
+
+  <div class="tab-bar">
+    <button class="tab-btn active" id="tab-url"  onclick="addTab('url')">🔗 URL</button>
+    <button class="tab-btn"        id="tab-pdf"  onclick="addTab('pdf')">📄 PDF</button>
+    <button class="tab-btn"        id="tab-text" onclick="addTab('text')">📝 テキスト</button>
+  </div>
+
+  <!-- URL tab -->
+  <div id="add-url-pane">
+    <div class="card">
+      <div class="inp-grp"><label>論文・記事の URL</label><input type="text" id="in-url" placeholder="https://pubmed.ncbi.nlm.nih.gov/..."></div>
+      <div class="inp-grp"><label>タイトル（省略可）</label><input type="text" id="in-url-title" placeholder="論文タイトル"></div>
+      <button class="btn btn-primary" onclick="doUrl()">🔍 URLから問題生成</button>
+      <p style="font-size:.75rem;color:var(--muted);margin-top:.6rem">※ CORS制限でURLの取得に失敗した場合は「テキスト」タブをお使いください</p>
+    </div>
+  </div>
+
+  <!-- PDF tab -->
+  <div id="add-pdf-pane" class="hidden">
+    <div class="card">
+      <div class="upload-zone" id="drop-zone" onclick="document.getElementById('pdf-in').click()">
+        <div style="font-size:2rem;margin-bottom:.4rem">📄</div>
+        <div style="font-weight:700">PDF をドロップ またはクリックして選択</div>
+        <div style="font-size:.8rem;margin-top:.2rem">日本語・英語論文対応 · 最大15ページ抽出</div>
+      </div>
+      <input type="file" id="pdf-in" accept=".pdf" style="display:none" onchange="doPDF(this)">
+      <div class="inp-grp" style="margin-top:.9rem"><label>タイトル（省略可）</label><input type="text" id="in-pdf-title" placeholder="論文タイトル"></div>
+    </div>
+  </div>
+
+  <!-- Text tab -->
+  <div id="add-text-pane" class="hidden">
+    <div class="card">
+      <div class="inp-grp"><label>タイトル</label><input type="text" id="in-text-title" placeholder="例: AHA 2024 Stroke Guidelines"></div>
+      <div class="inp-grp"><label>Abstract・本文・総説テキスト</label><textarea id="in-text" placeholder="論文のAbstractや本文を貼り付けてください..." style="min-height:180px"></textarea></div>
+      <button class="btn btn-primary" onclick="doText()">✨ テキストから問題生成</button>
+    </div>
+  </div>
+
+  <!-- Common options -->
+  <div class="card" style="background:#eff6ff;border-color:#bfdbfe">
+    <div style="font-size:.88rem;font-weight:800;color:var(--primary);margin-bottom:.75rem">⚙️ 問題の設定</div>
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:.75rem">
+      <div class="inp-grp" style="margin:0">
+        <label>問題数</label>
+        <select id="in-qcount">
+          <option value="1">1問</option>
+          <option value="2">2問</option>
+          <option value="3" selected>3問（最大）</option>
+        </select>
+      </div>
+      <div class="inp-grp" style="margin:0">
+        <label>難易度</label>
+        <select id="in-qdiff">
+          <option value="basic">🟢 基礎（研修医・入門）</option>
+          <option value="standard" selected>🟡 標準（専攻医・一般）</option>
+          <option value="advanced">🔴 上級（専門医・試験対策）</option>
+        </select>
+      </div>
+    </div>
+  </div>
+
+  <!-- Loading -->
+  <div id="add-loading" class="card loading hidden">
+    <div class="spinner"></div>
+    <div style="font-weight:700">AI が問題を生成中…</div>
+    <div style="font-size:.8rem">論文の内容を解析してクイズを作成しています</div>
+  </div>
+
+  <!-- Result -->
+  <div id="add-result" class="hidden">
+    <div class="card">
+      <div style="font-size:1rem;font-weight:800;margin-bottom:1rem">✅ 生成された問題</div>
+      <div id="result-list"></div>
+      <div class="row" style="margin-top:1rem">
+        <button class="btn btn-primary" onclick="saveQ()">💾 保存する</button>
+        <button class="btn btn-secondary" onclick="document.getElementById('add-result').classList.add('hidden')">やり直す</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ══════════════════════════ QUESTIONS VIEW ═══════════════════════ -->
+<div id="view-questions" class="hidden">
+  <div class="hdr-row">
+    <div class="page-title">問題集</div>
+    <div id="q-count" style="font-size:.83rem;color:var(--muted)"></div>
+  </div>
+  <div class="filter-row">
+    <button class="fc active" data-cat="all"          onclick="filt(this)">すべて</button>
+    <button class="fc"        data-cat="脳血管障害"    onclick="filt(this)">🧠 脳血管</button>
+    <button class="fc"        data-cat="てんかん・FND・頭痛" onclick="filt(this)">⚡ てんかん等</button>
+    <button class="fc"        data-cat="神経免疫疾患"  onclick="filt(this)">🛡️ 神経免疫</button>
+    <button class="fc"        data-cat="筋・神経筋接合部疾患" onclick="filt(this)">💪 筋疾患</button>
+    <button class="fc"        data-cat="変性疾患"      onclick="filt(this)">🔄 変性</button>
+    <button class="fc"        data-cat="その他"        onclick="filt(this)">📚 その他</button>
+  </div>
+  <div id="q-list"></div>
+</div>
+
+<!-- ══════════════════════════ SETTINGS VIEW ═══════════════════════ -->
+<div id="view-settings" class="hidden">
+  <div class="hdr-row"><div class="page-title">設定</div></div>
+
+  <div class="card">
+    <div style="font-size:.95rem;font-weight:800;margin-bottom:.9rem">🔑 Claude API キー</div>
+    <div class="inp-grp"><label>Anthropic API Key（sk-ant-...）</label><input type="password" id="in-apikey" placeholder="sk-ant-api03-..."></div>
+    <div class="inp-grp">
+      <label>使用モデル</label>
+      <select id="in-model">
+        <option value="claude-sonnet-4-6">Claude Sonnet 4.6（推奨・バランス型）</option>
+        <option value="claude-opus-4-6">Claude Opus 4.6（最高品質・低速）</option>
+        <option value="claude-haiku-4-5-20251001">Claude Haiku 4.5（高速・低コスト）</option>
+      </select>
+    </div>
+    <button class="btn btn-primary" onclick="saveApiKey()">保存</button>
+  </div>
+
+  <div class="card">
+    <div style="font-size:.95rem;font-weight:800;margin-bottom:.9rem">📋 1日の学習量</div>
+    <div class="inp-grp">
+      <label>セッションの最大問題数</label>
+      <select id="in-limit">
+        <option value="5">5問（約5分）</option>
+        <option value="8">8問（約8分）</option>
+        <option value="10" selected>10問（約10分）</option>
+        <option value="15">15問（約15分）</option>
+        <option value="20">20問（約20分）</option>
+      </select>
+    </div>
+    <button class="btn btn-primary" onclick="saveSettings()">保存</button>
+  </div>
+
+  <div class="card">
+    <div style="font-size:.95rem;font-weight:800;margin-bottom:.5rem">📖 日本ガイドライン 参照テキスト</div>
+    <p style="font-size:.8rem;color:var(--muted);margin-bottom:.75rem">NotebookLM や学会ガイドラインのテキストをここに貼り付けると、問題生成時の整合性チェックに使われます。<br>※ NotebookLM は直接アクセスできないため、ノートブック内のテキストをコピーしてください。</p>
+    <div class="inp-grp"><textarea id="in-gl" placeholder="例）脳卒中GL 2021: rt-PA投与可能時間窓は発症4.5時間以内…&#10;抗NMDAR抗体脳炎: ステロイド→IVIg→血漿交換…" style="min-height:160px"></textarea></div>
+    <button class="btn btn-primary" onclick="saveGL()">保存</button>
+  </div>
+
+  <div class="card">
+    <div style="font-size:.95rem;font-weight:800;margin-bottom:.9rem">🔒 パスワードロック</div>
+    <p style="font-size:.8rem;color:var(--muted);margin-bottom:.75rem">設定するとアプリ起動時にパスワード入力が必要になります。他人が使えないようにしたい場合に設定してください。</p>
+    <div id="pw-status" style="font-size:.83rem;margin-bottom:.75rem"></div>
+    <div class="inp-grp"><label>新しいパスワード</label><input type="password" id="in-pw1" placeholder="英数字・記号など自由に設定"></div>
+    <div class="inp-grp"><label>確認（もう一度）</label><input type="password" id="in-pw2" placeholder="同じパスワードを入力"></div>
+    <div class="row">
+      <button class="btn btn-primary" onclick="savePw()">🔒 設定する</button>
+      <button class="btn btn-danger"  onclick="removePw()">🔓 解除する</button>
+    </div>
+  </div>
+
+  <div class="card">
+    <div style="font-size:.95rem;font-weight:800;margin-bottom:.75rem">📊 統計</div>
+    <div id="stat-detail" style="font-size:.88rem;color:var(--muted);line-height:2"></div>
+  </div>
+
+  <div class="card">
+    <div style="font-size:.95rem;font-weight:800;color:var(--primary);margin-bottom:.75rem">📦 データ管理</div>
+    <div class="row">
+      <button class="btn btn-secondary" onclick="exportData()">📤 エクスポート</button>
+      <button class="btn btn-secondary" onclick="document.getElementById('import-in').click()">📥 インポート</button>
+    </div>
+    <input type="file" id="import-in" accept=".json" style="display:none" onchange="importData(this)">
+    <hr>
+    <button class="btn btn-danger" onclick="clearAll()">🗑️ 全データ削除</button>
+  </div>
+</div>
+
+</div><!-- /main -->
+
+<!-- ══════════════════════════════ MODAL ═══════════════════════════════ -->
+<div class="modal-ov hidden" id="modal" onclick="if(event.target===this)closeModal()">
+  <div class="modal">
+    <div class="modal-hdr">
+      <div class="modal-title">問題の詳細</div>
+      <button class="close-btn" onclick="closeModal()">✕</button>
+    </div>
+    <div id="modal-body"></div>
+    <div class="row" style="justify-content:flex-end;margin-top:1rem">
+      <button class="btn btn-danger"     id="modal-del">削除</button>
+      <button class="btn btn-secondary"  onclick="closeModal()">閉じる</button>
+    </div>
+  </div>
+</div>
+
+<div id="toast"></div>
+
+<!-- ══════════════════════════════ SCRIPT ══════════════════════════════ -->
+<script>
+/* ─── Storage ─────────────────────────────────────────────────────── */
+const SK = { cards:'nq_cards', apikey:'nq_apikey', model:'nq_model', settings:'nq_settings', stats:'nq_stats', gl:'nq_gl' };
+const ld = k => { try{ const d=localStorage.getItem(k); return d?JSON.parse(d):null }catch(e){return null} };
+const sv = (k,v) => localStorage.setItem(k, JSON.stringify(v));
+const getCards    = () => ld(SK.cards) || [];
+const saveCards   = c  => sv(SK.cards, c);
+const getSettings = () => ({ dailyLimit:10, ...ld(SK.settings) });
+const getStats    = () => ({ streak:0, lastStudy:null, totalAnswered:0, ...ld(SK.stats) });
+const saveStats   = s  => sv(SK.stats, s);
+
+/* ─── UUID ────────────────────────────────────────────────────────── */
+const uid = () => ([1e7]+-1e3+-4e3+-8e3+-1e11).replace(/[018]/g, c =>
+  (c ^ crypto.getRandomValues(new Uint8Array(1))[0] & 15 >> c / 4).toString(16));
+
+/* ─── Date helpers ────────────────────────────────────────────────── */
+const today = () => new Date().toISOString().slice(0,10);
+const addDays = (d, n) => { const dt=new Date(d); dt.setDate(dt.getDate()+n); return dt.toISOString().slice(0,10); };
+const diffDays = (a, b) => Math.round((new Date(a)-new Date(b))/86400000);
+
+/* ─── HTML escape ─────────────────────────────────────────────────── */
+const esc = s => s ? String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;') : '';
+
+/* ─── Toast ───────────────────────────────────────────────────────── */
+let _tt;
+const toast = (msg, type='ok') => {
+  const el = document.getElementById('toast');
+  el.textContent = (type==='err'?'❌ ':'✅ ') + msg;
+  el.style.background = type==='err' ? 'var(--red)' : '#1e293b';
+  el.classList.add('show');
+  clearTimeout(_tt);
+  _tt = setTimeout(()=>el.classList.remove('show'), 3000);
+};
+
+/* ─── Navigation ──────────────────────────────────────────────────── */
+let curView = 'study';
+const VIEWS = ['study','add','questions','settings'];
+function nav(v) {
+  VIEWS.forEach(x => {
+    document.getElementById('view-'+x).classList.toggle('hidden', x!==v);
+    document.getElementById('nav-'+x).classList.toggle('active', x===v);
+  });
+  curView = v;
+  if (v==='study')     initStudy();
+  if (v==='questions') renderQ();
+  if (v==='settings')  renderSettings();
+}
+
+/* ─── Category helpers ────────────────────────────────────────────── */
+const CAT_INFO = {
+  '脳血管障害':        { cls:'cat-stroke', icon:'🧠' },
+  'てんかん・FND・頭痛': { cls:'cat-ep',    icon:'⚡' },
+  '神経免疫疾患':      { cls:'cat-imm',   icon:'🛡️' },
+  '筋・神経筋接合部疾患':{ cls:'cat-mus',  icon:'💪' },
+  '変性疾患':          { cls:'cat-deg',   icon:'🔄' },
+  'その他':            { cls:'cat-oth',   icon:'📚' },
+};
+function catBadge(c) {
+  const i = CAT_INFO[c] || CAT_INFO['その他'];
+  return `<span class="badge ${i.cls}">${i.icon} ${esc(c||'その他')}</span>`;
+}
+function glBadge(a, r) {
+  const m = { green:{cls:'gl-green',lbl:'🟢 GL整合'}, yellow:{cls:'gl-yellow',lbl:'🟡 GL不明'}, red:{cls:'gl-red',lbl:'🔴 GL乖離'} };
+  const i = m[a] || m.yellow;
+  return `<span class="gl-badge ${i.cls}" title="${esc(r||'')}">${i.lbl}</span>`;
+}
+
+/* ═══════════════════════════ SRS ALGORITHM ════════════════════════ */
+/*  Based on SM-2 / Ebbinghaus forgetting curve
+    difficulty: 1=easy  2=normal  3=hard                            */
+function srsNext(card, diff) {
+  let { interval=1, ef=2.5, reps=0 } = card;
+
+  if (diff === 3) {          // Hard → reset, penalise EF
+    interval = 1;
+    ef = Math.max(1.3, ef - 0.2);
+    reps = Math.max(0, reps - 1);
+  } else if (diff === 2) {   // Normal → standard SM-2 steps
+    if      (reps === 0) interval = 1;
+    else if (reps === 1) interval = 4;
+    else                 interval = Math.round(interval * ef);
+    reps++;
+  } else {                   // Easy → accelerate, boost EF
+    if      (reps === 0) interval = 3;
+    else if (reps === 1) interval = 8;
+    else                 interval = Math.round(interval * ef * 1.15);
+    ef = Math.min(3.0, ef + 0.1);
+    reps++;
+  }
+  interval = Math.max(1, Math.min(interval, 180));
+  return { ...card, interval, ef, reps,
+    nextReview: addDays(today(), interval),
+    lastReviewed: today(),
+    totalRev: (card.totalRev||0)+1 };
+}
+
+function previewInterval(card, diff) {
+  const r = srsNext(card, diff);
+  return r.interval;
+}
+
+function getDue() {
+  const t = today();
+  return getCards().filter(c => !c.nextReview || c.nextReview <= t);
+}
+
+/* ═══════════════════════════ STUDY VIEW ═══════════════════════════ */
+let session = [], sIdx = 0, sTotal = 0;
+
+function initStudy() {
+  const cards = getCards(), due = getDue(), s = getSettings(), st = getStats();
+
+  // Update streak
+  const yest = addDays(today(), -1);
+  if (st.lastStudy && st.lastStudy !== today() && st.lastStudy !== yest) {
+    st.streak = 0; saveStats(st);
+  }
+
+  document.getElementById('s-today').textContent = Math.min(due.length, s.dailyLimit);
+  document.getElementById('s-streak').textContent = st.streak;
+  document.getElementById('s-total').textContent = cards.length;
+
+  // Start session
+  const sorted = due.sort((a,b)=>(a.nextReview||'2000').localeCompare(b.nextReview||'2000'));
+  session = sorted.slice(0, s.dailyLimit);
+  sIdx = 0;
+  sTotal = session.length;
+  renderCard();
+}
+
+function renderCard() {
+  const el = document.getElementById('quiz-area');
+
+  if (session.length === 0) {
+    el.innerHTML = `<div class="empty"><div class="empty-icon">📚</div>
+      <div style="font-weight:800;font-size:1.05rem;margin-bottom:.4rem">問題がまだありません</div>
+      <div>論文・記事を追加してクイズを作りましょう</div>
+      <button class="btn btn-primary" style="margin-top:1.25rem" onclick="nav('add')">➕ 論文を追加</button></div>`;
+    return;
+  }
+
+  if (sIdx >= session.length) {
+    // Session complete — update streak
+    const st = getStats();
+    if (st.lastStudy !== today()) {
+      const yest = addDays(today(),-1);
+      st.streak = (st.lastStudy===yest) ? st.streak+1 : 1;
+      st.lastStudy = today();
+      st.totalAnswered = (st.totalAnswered||0) + sTotal;
+      saveStats(st);
+      document.getElementById('s-streak').textContent = st.streak;
+    }
+    el.innerHTML = `<div class="quiz-card complete-screen">
+      <div style="font-size:3rem;margin-bottom:.75rem">🎉</div>
+      <div style="font-size:1.25rem;font-weight:800;margin-bottom:.4rem">セッション完了！</div>
+      <div style="color:var(--muted);margin-bottom:1.5rem">${sTotal}問を学習しました</div>
+      <div class="row" style="justify-content:center">
+        <button class="btn btn-primary"   onclick="session=[];initStudy()">もう一度（復習）</button>
+        <button class="btn btn-secondary" onclick="nav('add')">論文を追加</button>
+      </div></div>`;
+    document.getElementById('s-today').textContent = Math.max(0, getDue().length);
+    return;
+  }
+
+  const card = session[sIdx];
+  const pct = (sIdx / session.length * 100).toFixed(1);
+
+  el.innerHTML = `
+    <div class="progress-bar"><div class="progress-fill" style="width:${pct}%"></div></div>
+    <div class="progress-lbl">${sIdx+1} / ${session.length}</div>
+    <div class="quiz-card">
+      <div class="row" style="margin-bottom:1rem">
+        ${catBadge(card.category)}
+        ${glBadge(card.guidelineAlignment, card.guidelineReason)}
+      </div>
+      <div class="quiz-q">${esc(card.question)}</div>
+      ${card.sourceTitle?`<div style="margin-top:.9rem"><a href="${esc(card.sourceUrl||'#')}" class="src-chip" target="_blank">📄 ${esc(card.sourceTitle.slice(0,55))}${card.sourceTitle.length>55?'…':''}</a></div>`:''}
+
+      <div id="ans-area" style="display:none">
+        <div class="quiz-answer">
+          <div class="ans-label">解答</div>
+          <div class="ans-text">${esc(card.answer)}</div>
+          ${card.explanation?`<div class="exp-text">${esc(card.explanation)}</div>`:''}
+          ${card.guidelineReason?`<div class="gl-box"><strong>ガイドライン評価：</strong>${esc(card.guidelineReason)}</div>`:''}
+        </div>
+        <div class="diff-row">
+          <button class="diff-btn diff-hard"   onclick="answer(3)">😰 難しい<br><small>${previewInterval(card,3)}日後</small></button>
+          <button class="diff-btn diff-normal" onclick="answer(2)">🤔 普通<br><small>${previewInterval(card,2)}日後</small></button>
+          <button class="diff-btn diff-easy"   onclick="answer(1)">😊 簡単<br><small>${previewInterval(card,1)}日後</small></button>
+        </div>
+        <div class="srs-note">エビングハウス忘却曲線ベースのスペース反復 — 難易度で次回出題日が変わります</div>
+      </div>
+      <button class="reveal-btn" id="reveal-btn" onclick="reveal()">解答を見る →</button>
+    </div>`;
+}
+
+function reveal() {
+  document.getElementById('ans-area').style.display = 'block';
+  document.getElementById('reveal-btn').style.display = 'none';
+}
+
+function answer(diff) {
+  const card = session[sIdx];
+  const updated = srsNext(card, diff);
+  const cards = getCards();
+  const i = cards.findIndex(c=>c.id===card.id);
+  if (i>=0) { cards[i]=updated; saveCards(cards); }
+  sIdx++;
+  renderCard();
+  document.getElementById('s-today').textContent = Math.max(0, getDue().length);
+}
+
+/* ═══════════════════════════ ADD PAPER ════════════════════════════ */
+let pendingQ = [], pendingMeta = {};
+
+function addTab(t) {
+  ['url','pdf','text'].forEach(x => {
+    document.getElementById('add-'+x+'-pane').classList.toggle('hidden', x!==t);
+    document.getElementById('tab-'+x).classList.toggle('active', x===t);
+  });
+  document.getElementById('add-result').classList.add('hidden');
+}
+
+async function doUrl() {
+  const url   = document.getElementById('in-url').value.trim();
+  const title = document.getElementById('in-url-title').value.trim();
+  if (!url) { toast('URLを入力してください','err'); return; }
+  if (!requireApiKey()) return;
+
+  setLoading(true);
+  let text = '';
+  try {
+    const res = await fetch(url);
+    const html = await res.text();
+    const doc = new DOMParser().parseFromString(html,'text/html');
+    ['script','style','nav','footer','header','aside','noscript'].forEach(t=>doc.querySelectorAll(t).forEach(e=>e.remove()));
+    const main = doc.querySelector('article,main,[role="main"],.abstract,#abstract') || doc.body;
+    text = (main.innerText||main.textContent||'').replace(/\s+/g,' ').trim().slice(0,8000);
+  } catch(e) { /* CORS */ }
+
+  if (!text || text.length < 80) {
+    setLoading(false);
+    toast('URLの取得に失敗しました。「テキスト」タブをお使いください','err');
+    return;
+  }
+  pendingMeta = { title: title||url, url };
+  await generate(text);
+}
+
+async function doPDF(input) {
+  const file = input.files[0];
+  if (!file) return;
+  if (!requireApiKey()) return;
+  const title = document.getElementById('in-pdf-title').value.trim() || file.name;
+  setLoading(true);
+  try {
+    if (!window.pdfjsLib) throw new Error('PDF.js が読み込まれていません');
+    pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';
+    const buf = await file.arrayBuffer();
+    const pdf = await pdfjsLib.getDocument({data:buf}).promise;
+    let txt = '';
+    const pages = Math.min(pdf.numPages, 15);
+    for (let p=1; p<=pages; p++) {
+      const pg = await pdf.getPage(p);
+      const content = await pg.getTextContent();
+      txt += content.items.map(i=>i.str).join(' ') + '\n';
+    }
+    txt = txt.replace(/\s+/g,' ').trim().slice(0,8000);
+    if (!txt || txt.length < 50) throw new Error('テキスト抽出に失敗しました（スキャンPDFの可能性）');
+    pendingMeta = { title, url:'' };
+    await generate(txt);
+  } catch(e) {
+    setLoading(false);
+    toast('エラー: '+e.message,'err');
+  }
+}
+
+async function doText() {
+  const text  = document.getElementById('in-text').value.trim();
+  const title = document.getElementById('in-text-title').value.trim() || 'テキスト貼付';
+  if (!text || text.length<50) { toast('テキストを入力してください','err'); return; }
+  if (!requireApiKey()) return;
+  pendingMeta = { title, url:'' };
+  setLoading(true);
+  await generate(text);
+}
+
+function setLoading(on) {
+  document.getElementById('add-loading').classList.toggle('hidden', !on);
+}
+
+function requireApiKey() {
+  if (!ld(SK.apikey)) {
+    toast('先に API Key を設定してください','err');
+    setTimeout(()=>nav('settings'),600);
+    return false;
+  }
+  return true;
+}
+
+/* ─── AI call ───────────────────────────────────────────────────── */
+async function generate(text) {
+  const apiKey = ld(SK.apikey);
+  const model  = ld(SK.model) || 'claude-sonnet-4-6';
+  const glCtx  = ld(SK.gl) || '';
+
+  const qcount = document.getElementById('in-qcount').value;
+  const qdiff  = document.getElementById('in-qdiff').value;
+
+  const diffDesc = {
+    basic:    '【難易度: 基礎】研修医・医学生レベル。頻度の高い疾患の典型的な診断基準・第一選択薬など、必ず知っておくべき基本事項を問う。',
+    standard: '【難易度: 標準】神経内科専攻医レベル。ガイドラインの詳細、非典型例の鑑別、2次・3次選択の治療戦略など実臨床で使える知識を問う。',
+    advanced: '【難易度: 上級】神経内科専門医・学会試験レベル。エビデンスの背景、サブグループ解析、稀な合併症、最新知見、細かい数値・閾値まで問う。',
+  }[qdiff];
+
+  const system = `あなたは神経内科の教育専門家です。
+論文・記事テキストから、神経内科医が臨床で直接役立てられる知識を**ちょうど${qcount}問**のクイズとして作成してください。
+
+${diffDesc}
+
+【問題作成の基準】
+- 具体的な数値・診断基準・治療方針・薬剤名を含むもの優先
+- 記述式（解答は1〜3文程度）
+- 「なぜそうなのか」という理解につながる視点
+
+【日本ガイドライン整合性評価】
+日本神経学会・日本脳卒中学会・日本てんかん学会・日本神経免疫学会等のガイドラインと照合してください。
+${glCtx ? `\n参照ガイドラインテキスト:\n${glCtx.slice(0,2500)}` : ''}
+
+評価基準:
+- green: 日本のガイドラインと整合（または日本固有の内容）
+- yellow: 整合性不明確・評価困難（海外GL・エビデンス不足など）
+- red: 日本のガイドラインとの乖離が疑われる（未承認薬・推奨外治療など）
+
+【出力】JSONのみ。他のテキスト不要。
+[
+  {
+    "question": "問題文",
+    "answer": "模範解答（1〜3文）",
+    "explanation": "補足・覚え方（任意）",
+    "category": "脳血管障害|てんかん・FND・頭痛|神経免疫疾患|筋・神経筋接合部疾患|変性疾患|その他",
+    "guidelineAlignment": "green|yellow|red",
+    "guidelineReason": "整合性判断の根拠（日本語で簡潔に）"
+  }
+]`;
+
+  const userMsg = `論文タイトル: ${pendingMeta.title}\n\n---\n${text.slice(0,7000)}`;
+
+  try {
+    const res = await fetch('https://api.anthropic.com/v1/messages', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'x-api-key': apiKey,
+        'anthropic-version': '2023-06-01',
+        'anthropic-dangerous-direct-browser-access': 'true'
+      },
+      body: JSON.stringify({
+        model, max_tokens: 2200,
+        system,
+        messages: [{ role:'user', content: userMsg }]
+      })
+    });
+
+    if (!res.ok) {
+      const e = await res.json().catch(()=>({}));
+      throw new Error(e.error?.message || `API Error ${res.status}`);
+    }
+
+    const data = await res.json();
+    const raw  = data.content[0].text;
+    const m    = raw.match(/\[[\s\S]*\]/);
+    if (!m) throw new Error('AIの返答をパースできませんでした');
+    pendingQ = JSON.parse(m[0]);
+
+    setLoading(false);
+    renderResult();
+  } catch(e) {
+    setLoading(false);
+    toast('エラー: '+e.message,'err');
+  }
+}
+
+function renderResult() {
+  const el = document.getElementById('result-list');
+  const qdiff = document.getElementById('in-qdiff').value;
+  const diffBadge = { basic:'🟢 基礎', standard:'🟡 標準', advanced:'🔴 上級' }[qdiff] || '';
+  el.innerHTML = pendingQ.map((q,i)=>`
+    <div style="border:1px solid var(--border);border-radius:10px;padding:.9rem;margin-bottom:.65rem">
+      <div class="row" style="margin-bottom:.6rem">${catBadge(q.category)}${glBadge(q.guidelineAlignment,q.guidelineReason)}<span class="badge" style="background:#f1f5f9;color:#475569">${diffBadge}</span></div>
+      <div style="font-weight:700;margin-bottom:.4rem">Q${i+1}: ${esc(q.question)}</div>
+      <div style="font-size:.85rem;color:var(--muted);margin-bottom:.25rem"><strong>A:</strong> ${esc(q.answer)}</div>
+      ${q.explanation?`<div style="font-size:.78rem;color:var(--muted)">${esc(q.explanation)}</div>`:''}
+      ${q.guidelineReason?`<div style="font-size:.75rem;padding:.4rem .6rem;background:var(--bg);border-radius:6px;margin-top:.45rem">${esc(q.guidelineReason)}</div>`:''}
+    </div>`).join('');
+  document.getElementById('add-result').classList.remove('hidden');
+}
+
+function saveQ() {
+  const cards = getCards();
+  const t = today();
+  pendingQ.forEach(q => {
+    cards.push({
+      id: uid(),
+      question: q.question,
+      answer: q.answer,
+      explanation: q.explanation || '',
+      category: q.category || 'その他',
+      guidelineAlignment: q.guidelineAlignment || 'yellow',
+      guidelineReason: q.guidelineReason || '',
+      sourceTitle: pendingMeta.title,
+      sourceUrl: pendingMeta.url,
+      interval: 1, ef: 2.5, reps: 0,
+      nextReview: t, lastReviewed: null, totalRev: 0,
+      createdAt: new Date().toISOString()
+    });
+  });
+  saveCards(cards);
+  toast(`${pendingQ.length}問を追加しました！`);
+  pendingQ = [];
+  document.getElementById('add-result').classList.add('hidden');
+  document.getElementById('in-url').value='';
+  document.getElementById('in-url-title').value='';
+  document.getElementById('in-text').value='';
+  document.getElementById('in-text-title').value='';
+  document.getElementById('in-pdf-title').value='';
+  setTimeout(()=>nav('study'), 400);
+}
+
+/* ═══════════════════════════ QUESTIONS VIEW ═══════════════════════ */
+let activeCat = 'all';
+
+function filt(btn) {
+  activeCat = btn.dataset.cat;
+  document.querySelectorAll('.fc').forEach(b=>b.classList.toggle('active', b===btn));
+  renderQ();
+}
+
+function renderQ() {
+  const all = getCards();
+  const list = activeCat==='all' ? all : all.filter(c=>c.category===activeCat);
+  document.getElementById('q-count').textContent = list.length + '問';
+  const t = today();
+  const el = document.getElementById('q-list');
+
+  if (!list.length) {
+    el.innerHTML=`<div class="empty"><div class="empty-icon">📚</div>
+      <div style="font-weight:800;margin-bottom:.4rem">問題がありません</div>
+      <button class="btn btn-primary" style="margin-top:1rem" onclick="nav('add')">追加する</button></div>`;
+    return;
+  }
+
+  el.innerHTML = list.map(c => {
+    const dd = c.nextReview ? diffDays(c.nextReview, t) : 0;
+    const rc = dd<=0  ? `<span class="rc rc-due">出題あり</span>`
+             : dd<=3  ? `<span class="rc rc-soon">${dd}日後</span>`
+             :           `<span class="rc rc-later">${dd}日後</span>`;
+    return `<div class="q-item" onclick="openModal('${c.id}')">
+      <div class="q-hdr">${catBadge(c.category)}${glBadge(c.guidelineAlignment,c.guidelineReason)}${rc}</div>
+      <div class="q-text">${esc(c.question)}</div>
+      <div class="q-meta">
+        <span>📄 ${esc((c.sourceTitle||'').slice(0,40))}</span>
+        <span>🔁 ${c.totalRev||0}回</span>
+        <span>📅 ${c.interval||1}日間隔</span>
+      </div></div>`;
+  }).join('');
+}
+
+/* ═══════════════════════════ MODAL ════════════════════════════════ */
+let modalId = null;
+
+function openModal(id) {
+  const card = getCards().find(c=>c.id===id);
+  if (!card) return;
+  modalId = id;
+  document.getElementById('modal-body').innerHTML = `
+    <div class="row" style="margin-bottom:.9rem">${catBadge(card.category)}${glBadge(card.guidelineAlignment,card.guidelineReason)}</div>
+    <div style="font-weight:800;line-height:1.55;margin-bottom:.85rem">${esc(card.question)}</div>
+    <div style="padding:.8rem;background:var(--green-bg);border-radius:8px;margin-bottom:.75rem">
+      <div style="font-size:.7rem;font-weight:800;color:var(--green);margin-bottom:.3rem">解答</div>
+      <div style="font-size:.9rem">${esc(card.answer)}</div>
+    </div>
+    ${card.explanation?`<div style="font-size:.83rem;color:var(--muted);margin-bottom:.75rem">${esc(card.explanation)}</div>`:''}
+    ${card.guidelineReason?`<div class="gl-box" style="margin-bottom:.75rem"><strong>ガイドライン：</strong>${esc(card.guidelineReason)}</div>`:''}
+    ${card.sourceTitle?`<a href="${esc(card.sourceUrl||'#')}" class="src-chip" target="_blank">📄 ${esc(card.sourceTitle)}</a>`:''}
+    <hr>
+    <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:.5rem;text-align:center;font-size:.8rem">
+      <div><div style="font-weight:800;color:var(--primary)">${card.totalRev||0}</div><div style="color:var(--muted)">総回答</div></div>
+      <div><div style="font-weight:800;color:var(--primary)">${card.interval||1}日</div><div style="color:var(--muted)">現在間隔</div></div>
+      <div><div style="font-weight:800;color:var(--primary)">${card.nextReview||'未設定'}</div><div style="color:var(--muted)">次回</div></div>
+    </div>`;
+  document.getElementById('modal-del').onclick = ()=>delCard(id);
+  document.getElementById('modal').classList.remove('hidden');
+}
+
+function closeModal() { document.getElementById('modal').classList.add('hidden'); modalId=null; }
+
+function delCard(id) {
+  if (!confirm('この問題を削除しますか？')) return;
+  saveCards(getCards().filter(c=>c.id!==id));
+  closeModal();
+  renderQ();
+  toast('削除しました');
+}
+
+/* ═══════════════════════════ SETTINGS ════════════════════════════ */
+function renderSettings() {
+  const hasPw = !!localStorage.getItem(PW_KEY);
+  const pwStatus = document.getElementById('pw-status');
+  if (pwStatus) pwStatus.innerHTML = hasPw
+    ? '<span style="color:var(--green);font-weight:700">🔒 パスワード設定済み</span>'
+    : '<span style="color:var(--muted)">🔓 未設定（誰でもアクセス可能）</span>';
+  const key = ld(SK.apikey);
+  document.getElementById('in-apikey').value = key ? '●'.repeat(24) : '';
+  document.getElementById('in-model').value  = ld(SK.model) || 'claude-sonnet-4-6';
+  document.getElementById(
