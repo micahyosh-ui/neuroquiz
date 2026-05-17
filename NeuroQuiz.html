@@ -4,7 +4,6 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>NeuroQuiz — 神経内科クイズ</title>
-<script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
 <style>
 *{box-sizing:border-box;margin:0;padding:0}
 :root{
@@ -546,14 +545,28 @@ async function doUrl(){
   await generate(text);
 }
 
+async function loadPdfJs(){
+  if(window.pdfjsLib)return;
+  return new Promise((resolve,reject)=>{
+    const s=document.createElement('script');
+    s.src='https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js';
+    s.onload=()=>{
+      pdfjsLib.GlobalWorkerOptions.workerSrc='https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';
+      resolve();
+    };
+    s.onerror=()=>reject(new Error('PDF.js の読み込みに失敗しました'));
+    document.head.appendChild(s);
+  });
+}
 async function doPDF(input){
   const file=input.files[0];if(!file)return;
   if(!requireKey())return;
   const title=document.getElementById('in-pdf-title').value.trim()||file.name;
   setLoading(true);
   try{
+    await loadPdfJs();
     if(!window.pdfjsLib)throw new Error('PDF.js が読み込まれていません');
-    pdfjsLib.GlobalWorkerOptions.workerSrc='https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';
+
     const buf=await file.arrayBuffer();
     const pdf=await pdfjsLib.getDocument({data:buf}).promise;
     let txt='';const pages=Math.min(pdf.numPages,15);
@@ -748,3 +761,82 @@ function importData(input){
   r.onload=e=>{try{const d=JSON.parse(e.target.result);if(d.cards)saveCards(d.cards);if(d.stats)saveStats(d.stats);if(d.settings)sv(SK.settings,d.settings);toast(`インポート完了: ${d.cards?.length||0}問`);renderSettings();}catch(ex){toast('インポートエラー: '+ex.message,'err');}};
   r.readAsText(file);
 }
+function clearAll(){
+  if(!confirm('全データを削除しますか？この操作は取り消せません。'))return;
+  Object.values(SK).forEach(k=>localStorage.removeItem(k));session=[];toast('全データを削除しました');renderSettings();goNav('study');
+}
+
+/* ── Password Lock ── */
+async function hashPw(str){
+  try{
+    if(crypto&&crypto.subtle){
+      const buf=await crypto.subtle.digest('SHA-256',new TextEncoder().encode(str));
+      return 'sha:'+Array.from(new Uint8Array(buf)).map(b=>b.toString(16).padStart(2,'0')).join('');
+    }
+  }catch(e){}
+  let h=5381;for(let i=0;i<str.length;i++)h=((h<<5)+h)^str.charCodeAt(i);
+  return 'djb:'+(h>>>0).toString(16);
+}
+async function checkLock(){
+  try{
+    const stored=localStorage.getItem(SK.pw);
+    if(!stored){bootApp();return;}
+    if(sessionStorage.getItem('nq_unlocked')){bootApp();return;}
+    document.getElementById('lock').style.display='flex';
+    setTimeout(()=>document.getElementById('lin').focus(),100);
+  }catch(e){bootApp();}
+}
+async function doUnlock(){
+  const val=document.getElementById('lin').value;
+  const errEl=document.getElementById('lerr');
+  if(!val){errEl.textContent='パスワードを入力してください';return;}
+  try{
+    const hash=await hashPw(val);
+    if(hash===localStorage.getItem(SK.pw)){
+      sessionStorage.setItem('nq_unlocked','1');
+      document.getElementById('lock').style.display='none';
+      bootApp();
+    }else{
+      errEl.textContent='パスワードが違います';
+      document.getElementById('lin').value='';document.getElementById('lin').focus();
+      if(navigator.vibrate)navigator.vibrate([100,50,100]);
+    }
+  }catch(e){errEl.textContent='エラー: '+e.message;}
+}
+async function savePw(){
+  const p1=document.getElementById('in-pw1').value;
+  const p2=document.getElementById('in-pw2').value;
+  if(!p1){toast('パスワードを入力してください','err');return;}
+  if(p1!==p2){toast('パスワードが一致しません','err');return;}
+  if(p1.length<4){toast('4文字以上で設定してください','err');return;}
+  const hash=await hashPw(p1);
+  localStorage.setItem(SK.pw,hash);sessionStorage.setItem('nq_unlocked','1');
+  document.getElementById('in-pw1').value='';document.getElementById('in-pw2').value='';
+  renderSettings();toast('パスワードを設定しました 🔒');
+}
+function removePw(){
+  if(!localStorage.getItem(SK.pw)){toast('パスワードは設定されていません','err');return;}
+  if(!confirm('パスワードロックを解除しますか？'))return;
+  localStorage.removeItem(SK.pw);sessionStorage.removeItem('nq_unlocked');
+  renderSettings();toast('パスワードロックを解除しました 🔓');
+}
+function bootApp(){
+  document.getElementById('lock').style.display='none';
+  initStudy();
+}
+
+/* ── PDF drag & drop ── */
+const dz=document.getElementById('dropzone');
+dz.addEventListener('dragover',e=>{e.preventDefault();dz.classList.add('drag')});
+dz.addEventListener('dragleave',()=>dz.classList.remove('drag'));
+dz.addEventListener('drop',e=>{e.preventDefault();dz.classList.remove('drag');const f=e.dataTransfer.files[0];if(f?.type==='application/pdf')doPDF({files:[f]});});
+
+/* ── Init ── */
+if(window.location.protocol==='file:'){
+  bootApp();
+}else{
+  checkLock();
+}
+</script>
+</body>
+</html>
